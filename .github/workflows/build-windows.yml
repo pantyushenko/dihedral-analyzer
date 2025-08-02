@@ -1,0 +1,43 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Позволяет запускать вручную
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install MDAnalysis numpy scipy matplotlib tqdm pyinstaller
+        
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --name dihedral_analyzer_1.3_windows dihedral_analyzer_1.3.py
+        
+    - name: Get file size
+      run: |
+        $size = (Get-Item "dist\dihedral_analyzer_1.3_windows.exe").Length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "Executable size: $sizeMB MB"
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dihedral-analyzer-windows
+        path: dist/dihedral_analyzer_1.3_windows.exe
+        retention-days: 30 
