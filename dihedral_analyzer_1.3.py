@@ -226,6 +226,12 @@ Examples:
   
   # Remove PBC artifacts (use only if artifacts detected, takes 20min-2h):
   dihedral_analyzer_1.3.py topology.tpr trajectory.trr --angle1 "1,2,3,4" --remove-pbc
+  
+  # Remove PBC artifacts and clean temporary files:
+  dihedral_analyzer_1.3.py topology.tpr trajectory.trr --angle1 "1,2,3,4" --remove-pbc --clean-temp
+  
+  # Use existing temporary files (skip PBC processing):
+  dihedral_analyzer_1.3.py temp_centered_no_water.gro temp_centered_no_water.trr --angle1 "1,2,3,4"
         """
     )
     parser.add_argument("tpr_file", help="Path to topology file (.tpr or .gro)")
@@ -240,6 +246,10 @@ Examples:
                         help="Directory for output files (default: current directory)")
     parser.add_argument("--remove-pbc", action="store_true",
                         help="Remove periodic boundary artifacts. Use only if artifacts detected. Takes 20min-2h depending on system size.")
+    parser.add_argument("--keep-temp", action="store_true",
+                        help="Keep temporary files after PBC processing (default: files are kept)")
+    parser.add_argument("--clean-temp", action="store_true",
+                        help="Remove temporary files after PBC processing")
     
     # Пользовательские углы и расстояния будут добавляться динамически
     args, unknown = parser.parse_known_args()
@@ -287,6 +297,17 @@ Examples:
     tpr_file = args.tpr_file
     trr_file = args.trr_file
     
+    # Проверяем наличие существующих временных файлов
+    temp_files_exist = (os.path.exists("temp_centered_no_water.gro") and 
+                       os.path.exists("temp_centered_no_water.trr"))
+    
+    if temp_files_exist and not args.remove_pbc:
+        print("📁 Обнаружены существующие временные файлы PBC обработки:")
+        print("  - temp_centered_no_water.gro")
+        print("  - temp_centered_no_water.trr")
+        print("💡 Используйте эти файлы для анализа без повторной PBC обработки.")
+        print("   Или используйте --remove-pbc для создания новых файлов.")
+    
     if args.remove_pbc:
         print("⚠️  ВНИМАНИЕ: Удаление PBC артефактов может занять от 20 минут до 2 часов!")
         print("Этот процесс создаст временные файлы в текущей директории.")
@@ -322,16 +343,30 @@ Examples:
         print(f"Ошибка при выполнении анализа: {e}")
         return 1
     
-    # Очистка временных файлов если они были созданы
+    # Обработка временных файлов
     if args.remove_pbc:
-        try:
+        if args.clean_temp:
+            # Удаляем временные файлы
+            try:
+                if os.path.exists("temp_centered_no_water.trr"):
+                    os.remove("temp_centered_no_water.trr")
+                if os.path.exists("temp_centered_no_water.gro"):
+                    os.remove("temp_centered_no_water.gro")
+                print("✅ Временные файлы удалены.")
+            except Exception as e:
+                print(f"⚠️  Предупреждение: не удалось удалить временные файлы: {e}")
+        else:
+            # Сохраняем временные файлы (по умолчанию)
+            print("\n📁 Временные файлы сохранены:")
             if os.path.exists("temp_centered_no_water.trr"):
-                os.remove("temp_centered_no_water.trr")
+                size_trr = os.path.getsize("temp_centered_no_water.trr") / (1024*1024)  # MB
+                print(f"  - temp_centered_no_water.trr ({size_trr:.1f} MB)")
             if os.path.exists("temp_centered_no_water.gro"):
-                os.remove("temp_centered_no_water.gro")
-            print("Временные файлы удалены.")
-        except Exception as e:
-            print(f"Предупреждение: не удалось удалить временные файлы: {e}")
+                size_gro = os.path.getsize("temp_centered_no_water.gro") / 1024  # KB
+                print(f"  - temp_centered_no_water.gro ({size_gro:.1f} KB)")
+            print("\n💡 Эти файлы можно использовать для повторного анализа без PBC обработки.")
+            print("   Для удаления выполните: rm temp_centered_no_water.*")
+            print("   Или используйте флаг --clean-temp при следующем запуске.")
     
     return 0
 
