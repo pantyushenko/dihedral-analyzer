@@ -25,9 +25,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install MDAnalysis numpy scipy matplotlib tqdm pyinstaller
         
-    - name: Build executable
+    - name: Build executable with spec file
       run: |
-        pyinstaller --onefile --name dihedral_analyzer_1.3_windows dihedral_analyzer_1.3.py
+        echo "Building executable using custom spec file..."
+        pyinstaller dihedral_analyzer_1.3_windows.spec
+        
+    - name: Test executable
+      run: |
+        echo "Testing executable..."
+        .\dist\dihedral_analyzer_1.3_windows.exe --help
         
     - name: Get file size
       run: |
@@ -40,4 +46,4 @@ jobs:
       with:
         name: dihedral-analyzer-windows
         path: dist/dihedral_analyzer_1.3_windows.exe
-        retention-days: 30 
+        retention-days: 30
