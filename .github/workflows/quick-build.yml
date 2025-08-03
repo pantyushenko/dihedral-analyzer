@@ -1,0 +1,61 @@
+name: Quick Build and Upload
+
+on:
+  workflow_dispatch:  # Только ручной запуск
+
+permissions:
+  contents: write  # Права на запись в репозиторий
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install MDAnalysis numpy scipy matplotlib tqdm pyinstaller
+        
+    - name: Build executable
+      run: |
+        echo "Building executable using spec file..."
+        pyinstaller dihedral_analyzer_1.3_windows.spec
+        
+    - name: Test executable
+      run: |
+        echo "Testing executable..."
+        .\dist\dihedral_analyzer_1.3_windows.exe --help
+        
+    - name: Get file size
+      run: |
+        $size = (Get-Item "dist\dihedral_analyzer_1.3_windows.exe").Length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "Executable size: $sizeMB MB"
+        
+    - name: Copy executable to root
+      run: |
+        echo "Copying executable to repository root..."
+        copy "dist\dihedral_analyzer_1.3_windows.exe" "dihedral_analyzer_1.3_windows.exe"
+        
+    - name: Create build info
+      run: |
+        echo "Creating build info file..."
+        $buildInfo = "Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')`nFile Size: $sizeMB MB`nGitHub Run ID: ${{ github.run_id }}`n`nFeatures:`n- Analysis of dihedral angles`n- Analysis of distances`n- Progress bars for all operations`n- PBC artifact removal`n- Temporary file management`n- Frame numbers in output CSV files"
+        $buildInfo | Out-File -FilePath "BUILD_INFO.md" -Encoding UTF8
+        
+    - name: Commit and push
+      run: |
+        echo "Committing and pushing executable to repository..."
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add dihedral_analyzer_1.3_windows.exe BUILD_INFO.md
+        git commit -m "Add Windows executable (Build ${{ github.run_number }})"
+        git push

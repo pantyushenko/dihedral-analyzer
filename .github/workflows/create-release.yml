@@ -1,0 +1,89 @@
+name: Create Release
+
+on:
+  workflow_dispatch:  # Только ручной запуск
+
+permissions:
+  contents: write  # Явно указываем права на запись
+
+jobs:
+  create-release:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install MDAnalysis numpy scipy matplotlib tqdm pyinstaller
+        
+    - name: Build executable with spec file
+      run: |
+        echo "Building executable using custom spec file..."
+        pyinstaller dihedral_analyzer_1.3_windows.spec
+        
+    - name: Test executable
+      run: |
+        echo "Testing executable..."
+        .\dist\dihedral_analyzer_1.3_windows.exe --help
+        
+    - name: Get file size
+      id: file_size
+      run: |
+        $size = (Get-Item "dist\dihedral_analyzer_1.3_windows.exe").Length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "size=$sizeMB" >> $env:GITHUB_OUTPUT
+        echo "Executable size: $sizeMB MB"
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Dihedral Analyzer v1.3 Windows Build ${{ github.run_number }}
+        body: |
+          ## Dihedral Analyzer v1.3 Windows Executable
+          
+          **Build Number:** ${{ github.run_number }}
+          **Build Date:** ${{ github.event.head_commit.timestamp }}
+          
+          ### Features:
+          - ✅ Analysis of dihedral angles
+          - ✅ Analysis of distances
+          - ✅ Progress bars for all operations
+          - ✅ PBC artifact removal
+          - ✅ Temporary file management
+          - ✅ Frame numbers in output CSV files
+          
+          ### Usage:
+          ```cmd
+          dihedral_analyzer_1.3_windows.exe --help
+          dihedral_analyzer_1.3_windows.exe topology.gro md.trr --angle1 "1,2,3,4"
+          ```
+          
+          ### System Requirements:
+          - Windows 10/11
+          - 4+ GB RAM for large trajectories
+          
+          **File Size:** ${{ steps.file_size.outputs.size }} MB
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/dihedral_analyzer_1.3_windows.exe
+        asset_name: dihedral_analyzer_1.3_windows.exe
+        asset_content_type: application/octet-stream 

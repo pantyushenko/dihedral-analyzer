@@ -1,0 +1,69 @@
+name: Build Windows Executable and Upload to Repo
+
+on:
+  workflow_dispatch:  # Только ручной запуск для загрузки в репозиторий
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install MDAnalysis numpy scipy matplotlib tqdm pyinstaller
+        
+    - name: Build executable with spec file
+      run: |
+        echo "Building executable using custom spec file..."
+        pyinstaller dihedral_analyzer_1.3_windows.spec
+        
+    - name: Test executable
+      run: |
+        echo "Testing executable..."
+        .\dist\dihedral_analyzer_1.3_windows.exe --help
+        
+    - name: Get file size
+      id: file_size
+      run: |
+        $size = (Get-Item "dist\dihedral_analyzer_1.3_windows.exe").Length
+        $sizeMB = [math]::Round($size / 1MB, 2)
+        echo "size=$sizeMB" >> $env:GITHUB_OUTPUT
+        echo "Executable size: $sizeMB MB"
+        
+    - name: Copy executable to root
+      run: |
+        echo "Copying executable to repository root..."
+        copy "dist\dihedral_analyzer_1.3_windows.exe" "dihedral_analyzer_1.3_windows.exe"
+        
+    - name: Create build info file
+      run: |
+        echo "Creating build info file..."
+        $buildInfo = "# Build Information`nBuild Number: ${{ github.run_number }}`nBuild Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')`nFile Size: ${{ steps.file_size.outputs.size }} MB`nGitHub Run ID: ${{ github.run_id }}`n`n## Features`n- Analysis of dihedral angles`n- Analysis of distances`n- Progress bars for all operations`n- PBC artifact removal`n- Temporary file management`n- Frame numbers in output CSV files`n`n## Usage`n```cmd`ndihedral_analyzer_1.3_windows.exe --help`ndihedral_analyzer_1.3_windows.exe topology.gro md.trr --angle1 '1,2,3,4'`n````n`n## System Requirements`n- Windows 10/11`n- 4+ GB RAM for large trajectories"
+        $buildInfo | Out-File -FilePath "BUILD_INFO.md" -Encoding UTF8
+        
+    - name: Commit and push executable
+      run: |
+        echo "Committing and pushing executable to repository..."
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add dihedral_analyzer_1.3_windows.exe BUILD_INFO.md
+        git commit -m "Add Windows executable (Build ${{ github.run_number }})"
+        git push
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dihedral-analyzer-windows
+        path: dist/dihedral_analyzer_1.3_windows.exe
+        retention-days: 30 
